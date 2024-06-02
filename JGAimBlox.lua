@@ -1,32 +1,121 @@
--- Serviços necessários
+-- Função AIMBOT
+
 local Players = game:GetService("Players")
-local RunService = game:GetService("RunService")
-local Workspace = game:GetService("Workspace")
+local Camera = game:GetService("Workspace").CurrentCamera
 local UserInputService = game:GetService("UserInputService")
-local Camera = Workspace.CurrentCamera
-local LocalPlayer = Players.LocalPlayer
-local Mouse = LocalPlayer:GetMouse()
+local RunService = game:GetService("RunService")
+local Mouse = Players.LocalPlayer:GetMouse()
 
--- Variáveis de controle
-local ESPEnabled = true
-local AIMEnabled = false
-local ESPColor = Color3.fromRGB(255, 0, 0) -- Vermelho para inimigos
-local FOVRadius = 300
-local arrowSize = Vector3.new(2, 2, 2)
-local sensitivity = 1 -- Sensibilidade padrão
+local function IsMobile()
+    return UserInputService.TouchEnabled
+end
+
 local target = nil
+local aiming = false
 
--- Função para encontrar a HumanoidRootPart de um modelo de jogador ou NPC
 local function FindHumanoidRootPart(model)
     return model and model:FindFirstChild("HumanoidRootPart")
 end
 
--- Função para encontrar a cabeça de um modelo de jogador
-local function FindHead(model)
-    return model and model:FindFirstChild("Head")
+local function GetNearestVisibleTarget()
+    local localPlayer = Players.LocalPlayer
+    local localTeam = localPlayer.Team
+    local closestTarget = nil
+    local minDistance = math.huge
+
+    for _, player in ipairs(Players:GetPlayers()) do
+        if player ~= localPlayer and (not localTeam or player.Team ~= localTeam) then
+            local humanoidRootPart = FindHumanoidRootPart(player.Character)
+            if humanoidRootPart then
+                local distance = (localPlayer.Character.HumanoidRootPart.Position - humanoidRootPart.Position).Magnitude
+                if distance < minDistance then
+                    minDistance = distance
+                    closestTarget = humanoidRootPart
+                end
+            end
+        end
+    end
+
+    return closestTarget
 end
 
--- Função para criar ESP para um jogador
+local function AimAtTarget()
+    if target then
+        Camera.CFrame = CFrame.new(Camera.CFrame.Position, target.Position)
+    end
+end
+
+local function ToggleCameraMode()
+    local player = Players.LocalPlayer
+    if player.CameraMode == Enum.CameraMode.LockFirstPerson then
+        player.CameraMode = Enum.CameraMode.Classic
+    else
+        player.CameraMode = Enum.CameraMode.LockFirstPerson
+    end
+end
+
+local function OnMouseRightButtonDown()
+    aiming = true
+    target = GetNearestVisibleTarget()
+    if target then
+        AimAtTarget()
+    end
+end
+
+local function OnMouseRightButtonUp()
+    aiming = false
+    target = nil
+end
+
+local function CreateMobileButtons()
+    local playerGui = Players.LocalPlayer:WaitForChild("PlayerGui")
+
+    local mobileGui = Instance.new("ScreenGui", playerGui)
+    mobileGui.Name = "MobileControls"
+    mobileGui.ResetOnSpawn = false
+
+    local aimButton = Instance.new("TextButton", mobileGui)
+    aimButton.Size = UDim2.new(0.2, 0, 0.1, 0)
+    aimButton.Position = UDim2.new(0.012, 0, 0.243, 0)
+    aimButton.Text = "Aimbot - ON/OFF"
+    aimButton.BackgroundColor3 = Color3.fromRGB(98, 0, 0)
+    aimButton.Font = Enum.Font.SourceSansBold
+    aimButton.TextSize = 22
+    aimButton.TextColor3 = Color3.fromRGB(255, 255, 255)
+    aimButton.TextStrokeColor3 = Color3.fromRGB(0, 0, 0)
+    aimButton.TextStrokeTransparency = 0
+
+    return mobileGui, aimButton
+end
+
+if IsMobile() then
+    local mobileGui, aimButton = CreateMobileButtons()
+
+    aimButton.MouseButton1Click:Connect(function()
+        aiming = not aiming
+        if aiming then
+            target = GetNearestVisibleTarget()
+            AimAtTarget()
+        else
+            target = nil
+        end
+    end)
+end
+
+RunService.RenderStepped:Connect(function()
+    if aiming then
+        target = GetNearestVisibleTarget()
+        AimAtTarget()
+    end
+end)
+
+-- Função ESP
+
+local ESPEnabled = true
+local ESPColor = Color3.fromRGB(255, 0, 0)
+local FOVRadius = 300
+local arrowSize = Vector3.new(2, 2, 2)
+
 local function createESP(player)
     local character = player.Character
     if character then
@@ -41,7 +130,6 @@ local function createESP(player)
     end
 end
 
--- Função para remover ESP de um jogador
 local function removeESP(player)
     local character = player.Character
     if character then
@@ -53,12 +141,10 @@ local function removeESP(player)
     end
 end
 
--- Função para verificar o time
 local function getTeam(player)
     return player.Team
 end
 
--- Função principal do ESP
 local function updateESP()
     if not ESPEnabled then return end
 
@@ -76,162 +162,6 @@ local function updateESP()
     end
 end
 
--- Função para desenhar setas apontando para inimigos fora da tela
-local function updateArrows()
-    for _, arrow in pairs(Workspace:GetChildren()) do
-        if arrow:IsA("Part") and arrow.Name == "ESPArrow" then
-            arrow:Destroy()
-        end
-    end
-
-    local localPlayer = Players.LocalPlayer
-    local localTeam = getTeam(localPlayer)
-
-    for _, player in pairs(Players:GetPlayers()) do
-        if player ~= localPlayer and getTeam(player) ~= localTeam and player.Character and player.Character:FindFirstChild("HumanoidRootPart") then
-            local enemyPosition, onScreen = Camera:WorldToViewportPoint(player.Character.HumanoidRootPart.Position)
-            if not onScreen then
-                local arrow = Instance.new("Part")
-                arrow.Name = "ESPArrow"
-                arrow.Size = arrowSize
-                arrow.Anchored = true
-                arrow.CanCollide = false
-                arrow.Color = ESPColor
-                arrow.Position = localPlayer.Character.HumanoidRootPart.Position + (enemyPosition - localPlayer.Character.HumanoidRootPart.Position).Unit * 5
-                arrow.CFrame = CFrame.new(arrow.Position, localPlayer.Character.HumanoidRootPart.Position)
-                arrow.Parent = Workspace
-            end
-        end
-    end
-end
-
--- Função para alternar o ESP
-local function toggleESP()
-    ESPEnabled = not ESPEnabled
-    if not ESPEnabled then
-        for _, player in pairs(Players:GetPlayers()) do
-            removeESP(player)
-        end
-    end
-end
-
--- Função para verificar se há linha de visão desobstruída para o alvo
-local function isVisible(targetPosition)
-    local rayOrigin = Camera.CFrame.Position
-    local rayDirection = (targetPosition - rayOrigin).Unit * 500
-    local raycastParams = RaycastParams.new()
-    raycastParams.FilterDescendantsInstances = {LocalPlayer.Character, Camera}
-    raycastParams.FilterType = Enum.RaycastFilterType.Blacklist
-    local raycastResult = Workspace:Raycast(rayOrigin, rayDirection, raycastParams)
-    if raycastResult then
-        return false
-    else
-        return true
-    end
-end
-
--- Função para encontrar o alvo mais próximo visível
-local function GetNearestVisibleTarget()
-    local localPlayer = Players.LocalPlayer
-    local localTeam = localPlayer.Team
-    local targets = {}
-
-    for _, player in ipairs(Players:GetPlayers()) do
-        if player ~= localPlayer and (not localTeam or player.Team ~= localTeam) then
-            local humanoidRootPart = FindHumanoidRootPart(player.Character)
-            local head = FindHead(player.Character)
-            if humanoidRootPart and head then
-                table.insert(targets, {rootPart = humanoidRootPart, head = head})
-            end
-        end
-    end
-
-    local closestTarget = nil
-    local minDistance = math.huge
-
-    for _, targetInfo in ipairs(targets) do
-        local screenPos, onScreen = Camera:WorldToViewportPoint(targetInfo.head.Position)
-        if onScreen and isVisible(targetInfo.head.Position) then
-            local distance = (Vector2.new(screenPos.X, screenPos.Y) - Vector2.new(Mouse.X, Mouse.Y)).Magnitude
-            if distance < minDistance then
-                minDistance = distance
-                closestTarget = targetInfo.head
-            end
-        end
-    end
-
-    return closestTarget
-end
-
--- Função para mirar no alvo
-local function AimAtTarget()
-    if target then
-        Camera.CFrame = CFrame.new(Camera.CFrame.Position, target.Position)
-    end
-end
-
--- Função para alternar entre primeira e terceira pessoa ao pressionar a tecla F
-local function ToggleCameraMode()
-    local player = Players.LocalPlayer
-    if player.CameraMode == Enum.CameraMode.LockFirstPerson then
-        player.CameraMode = Enum.CameraMode.Classic
-    else
-        player.CameraMode = Enum.CameraMode.LockFirstPerson
-    end
-end
-
--- Função para processar a entrada do botão direito do mouse
-local function OnMouseRightButtonDown()
-    AIMEnabled = true
-    target = GetNearestVisibleTarget()
-    if target then
-        AimAtTarget()
-    end
-end
-
--- Função para processar a liberação do botão direito do mouse
-local function OnMouseRightButtonUp()
-    AIMEnabled = false
-    target = nil
-end
-
--- Função para criar botões para dispositivos móveis
-local function CreateMobileButtons()
-    local playerGui = Players.LocalPlayer:WaitForChild("PlayerGui")
-
-    local mobileGui = Instance.new("ScreenGui", playerGui)
-    mobileGui.Name = "MobileControls"
-
-    local aimButton = Instance.new("TextButton", mobileGui)
-    aimButton.Size = UDim2.new(0.2, 0, 0.1, 0)
-    aimButton.Position = UDim2.new(0.012, 0, 0.243, 0)
-    aimButton.Text = "Aimbot - ON/OFF"
-    aimButton.BackgroundColor3 = Color3.fromRGB(98, 0, 0)
-    aimButton.Font = Enum.Font.SourceSansBold
-    aimButton.TextSize = 22
-    aimButton.TextColor3 = Color3.fromRGB(255, 255, 255)
-    aimButton.TextStrokeColor3 = Color3.fromRGB(0, 0, 0)
-    aimButton.TextStrokeTransparency = 0
-
-    return mobileGui, aimButton
-end
-
--- Criar controles para celular se o jogador estiver em um dispositivo móvel
-if UserInputService.TouchEnabled then
-    local mobileGui, aimButton = CreateMobileButtons()
-
-    aimButton.MouseButton1Click:Connect(function()
-        AIMEnabled = not AIMEnabled
-        if AIMEnabled then
-            target = GetNearestVisibleTarget()
-            AimAtTarget()
-        else
-            target = nil
-        end
-    end)
-end
-
--- Função para criar FOV
 local function createFOV()
     local FOVCircle = Instance.new("Frame")
     FOVCircle.Size = UDim2.new(0, FOVRadius * 2, 0, FOVRadius * 2)
@@ -249,36 +179,70 @@ local function createFOV()
     Border.BorderSizePixel = 0
     Border.Parent = FOVCircle
 
-    FOVCircle.Parent = LocalPlayer:WaitForChild("PlayerGui")
+    FOVCircle.Parent = Players.LocalPlayer:WaitForChild("PlayerGui")
+    FOVCircle.ResetOnSpawn = false
     return FOVCircle
 end
 
 local FOVCircle = createFOV()
 
--- Conexão de eventos
-Mouse.Button2Down:Connect(OnMouseRightButtonDown)
-Mouse.Button2Up:Connect(OnMouseRightButtonUp)
+local function createTraceLine(startPos, endPos, parent)
+    local line = Instance.new("Frame")
+    line.BackgroundColor3 = ESPColor
+    line.BorderSizePixel = 0
+    line.AnchorPoint = Vector2.new(0.5, 0.5)
+    
+    local distance = (startPos - endPos).Magnitude
+    line.Size = UDim2.new(0, distance, 0, 2)
+    
+    local midpoint = (startPos + endPos) / 2
+    line.Position = UDim2.new(0, midpoint.X, 0, midpoint.Y)
+    
+    local angle = math.atan2(endPos.Y - startPos.Y, endPos.X - startPos.X)
+    line.Rotation = math.deg(angle)
+    
+    line.Parent = parent
+    return line
+end
 
-RunService.RenderStepped:Connect(function()
-    if AIMEnabled then
-        target = GetNearestVisibleTarget()
-        AimAtTarget()
+local function updateTraces()
+    local screenGui = Players.LocalPlayer:WaitForChild("PlayerGui"):WaitForChild("ESPUI")
+    for _, child in ipairs(screenGui:GetChildren()) do
+        if child.Name == "ESPTrace" then
+            child:Destroy()
+        end
     end
-end)
 
-Players.PlayerAdded:Connect(updateESP)
-Players.PlayerRemoving:Connect(updateESP)
-RunService.RenderStepped:Connect(function()
-    updateESP()
-    FOVCircle.Visible = ESPEnabled
-    updateArrows()
-end)
+    local localPlayer = Players.LocalPlayer
+    local localTeam = getTeam(localPlayer)
+    local screenCenter = Vector2.new(Camera.ViewportSize.X / 2, Camera.ViewportSize.Y / 2)
 
--- Criar um botão de ativação/desativação na interface
+    for _, player in pairs(Players:GetPlayers()) do
+        if player ~= localPlayer and getTeam(player) ~= localTeam and player.Character and player.Character:FindFirstChild("HumanoidRootPart") then
+            local enemyPos, onScreen = Camera:WorldToViewportPoint(player.Character.HumanoidRootPart.Position)
+            if not onScreen then
+                local traceLine = createTraceLine(screenCenter, Vector2.new(enemyPos.X, enemyPos.Y), screenGui)
+                traceLine.Name = "ESPTrace"
+            end
+        end
+    end
+end
+
+local function toggleESP()
+    ESPEnabled = not ESPEnabled
+    if not ESPEnabled then
+        for _, player in pairs(Players:GetPlayers()) do
+            removeESP(player)
+        end
+    end
+end
+
 local ScreenGui = Instance.new("ScreenGui")
+ScreenGui.ResetOnSpawn = false
+
 local ToggleButton = Instance.new("TextButton")
 
-ScreenGui.Parent = LocalPlayer:WaitForChild("PlayerGui")
+ScreenGui.Parent = Players.LocalPlayer:WaitForChild("PlayerGui")
 ScreenGui.Name = "ESPUI"
 
 ToggleButton.Parent = ScreenGui
@@ -292,3 +256,12 @@ ToggleButton.Font = Enum.Font.SourceSansBold
 ToggleButton.TextSize = 22
 
 ToggleButton.MouseButton1Click:Connect(toggleESP)
+
+Players.PlayerAdded:Connect(updateESP)
+Players.PlayerRemoving:Connect(updateESP)
+RunService.RenderStepped:Connect(function()
+    updateESP()
+    FOVCircle.Visible = ESPEnabled
+    updateArrows()
+    updateTraces()
+end)
