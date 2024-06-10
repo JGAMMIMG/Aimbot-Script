@@ -23,7 +23,10 @@ local currentIndex = 1
 local minDistance = 5
 
 local function teleportToPosition(position)
-    local currentCFrame = humanoidRootPart.CFrame
+    local seat = character:FindFirstChildOfClass("Seat") or character:FindFirstChildOfClass("VehicleSeat")
+    local targetPart = seat or humanoidRootPart
+
+    local currentCFrame = targetPart.CFrame
     local rotation = currentCFrame - currentCFrame.p
 
     local targetCFrame = CFrame.new(position) * rotation
@@ -33,18 +36,16 @@ local function teleportToPosition(position)
         CFrame = targetCFrame
     }
 
-    local tween = TweenService:Create(humanoidRootPart, tweenInfo, tweenProperties)
+    local tween = TweenService:Create(targetPart, tweenInfo, tweenProperties)
     tween:Play()
 
     tween.Completed:Wait()
 end
 
--- Função para garantir o movimento mesmo quando sentado
+-- Função para garantir o movimento
 local function forceMove()
     while getgenv().teleport and currentIndex <= #coordinates do
         local targetPosition = coordinates[currentIndex]
-        -- Desativa colisão para garantir o movimento
-        humanoidRootPart.CanCollide = false
         teleportToPosition(targetPosition)
 
         -- Aguarda até que o jogador esteja próximo da posição desejada
@@ -54,31 +55,7 @@ local function forceMove()
 
         currentIndex = currentIndex + 1
     end
-    -- Reativa a colisão após o teletransporte
-    humanoidRootPart.CanCollide = true
 end
 
--- Detecta quando o jogador está sentado
-local function isSitting()
-    local seat = character:FindFirstChildOfClass("Seat")
-    local vehicleSeat = character:FindFirstChildOfClass("VehicleSeat")
-    return seat or vehicleSeat
-end
-
--- Monitora o estado do jogador
-local function monitorPlayerState()
-    while getgenv().teleport do
-        if isSitting() then
-            local seat = isSitting()
-            local weld = seat:FindFirstChildWhichIsA("Weld")
-            if weld then
-                weld:Destroy() -- Remove o weld para permitir o movimento
-            end
-        end
-        wait(0.1)
-    end
-end
-
--- Inicia o movimento forçado e a monitoração do estado do jogador
-coroutine.wrap(monitorPlayerState)()
+-- Inicia o movimento forçado
 forceMove()
