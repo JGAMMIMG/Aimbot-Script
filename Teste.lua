@@ -39,13 +39,23 @@ local function teleportToPosition(position)
     tween.Completed:Wait()
 end
 
-while getgenv().teleport and currentIndex <= #coordinates do
-    local targetPosition = coordinates[currentIndex]
-    teleportToPosition(targetPosition)
+-- Função para garantir o movimento mesmo quando sentado
+local function forceMove()
+    while getgenv().teleport and currentIndex <= #coordinates do
+        local targetPosition = coordinates[currentIndex]
+        -- Desativa colisão para garantir o movimento
+        humanoidRootPart.CanCollide = false
+        teleportToPosition(targetPosition)
 
-    while (humanoidRootPart.Position - targetPosition).Magnitude > minDistance do
-        wait(0.1)
+        -- Aguarda até que o jogador esteja próximo da posição desejada
+        while (humanoidRootPart.Position - targetPosition).Magnitude > minDistance do
+            wait(0.1)
+        end
+
+        currentIndex = currentIndex + 1
     end
-
-    currentIndex = currentIndex + 1
+    -- Reativa a colisão após o teletransporte
+    humanoidRootPart.CanCollide = true
 end
+
+forceMove()
