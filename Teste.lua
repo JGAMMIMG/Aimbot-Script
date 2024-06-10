@@ -1,4 +1,10 @@
--- Lista de coordenadas
+getgenv().teleport = true
+
+local player = game.Players.LocalPlayer
+local character = player.Character or player.CharacterAdded:Wait()
+local humanoidRootPart = character:WaitForChild("HumanoidRootPart")
+local TweenService = game:GetService('TweenService')
+
 local coordinates = {
     Vector3.new(1502.1358642578125, 6.804904937744141, 353.610595703125),
     Vector3.new(-198.3150177001953, 6.7924957275390625, 733.0482788085938),
@@ -13,50 +19,33 @@ local coordinates = {
     Vector3.new(2896.74072265625, 6.837685585021973, -425.4273986816406)
 }
 
--- Variável para armazenar o índice atual
 local currentIndex = 1
-
--- Distância mínima para considerar que o jogador atingiu a posição
 local minDistance = 5
 
--- Função para teleportar o jogador para a próxima coordenada na lista
-local function teleportPlayer(player)
-    if player and player.Character and player.Character:FindFirstChild("HumanoidRootPart") then
-        local targetPosition = coordinates[currentIndex]
-        player.Character.HumanoidRootPart.CFrame = CFrame.new(targetPosition)
-        print("Jogador teleportado para: " .. tostring(targetPosition))
-    else
-        warn("O jogador ou a parte do humanoide não foi encontrada.")
-    end
+local function teleportToPosition(position)
+    local currentCFrame = humanoidRootPart.CFrame
+    local rotation = currentCFrame - currentCFrame.p
+
+    local targetCFrame = CFrame.new(position) * rotation
+
+    local tweenInfo = TweenInfo.new(1, Enum.EasingStyle.Linear)
+    local tweenProperties = {
+        CFrame = targetCFrame
+    }
+
+    local tween = TweenService:Create(humanoidRootPart, tweenInfo, tweenProperties)
+    tween:Play()
+
+    tween.Completed:Wait()
 end
 
--- Função para verificar a distância do jogador até a coordenada
-local function checkDistance(player)
-    if player and player.Character and player.Character:FindFirstChild("HumanoidRootPart") then
-        local playerPosition = player.Character.HumanoidRootPart.Position
-        local targetPosition = coordinates[currentIndex]
-        local distance = (playerPosition - targetPosition).Magnitude
+while getgenv().teleport and currentIndex <= #coordinates do
+    local targetPosition = coordinates[currentIndex]
+    teleportToPosition(targetPosition)
 
-        if distance <= minDistance then
-            -- Avança para a próxima coordenada
-            currentIndex = currentIndex + 1
-            if currentIndex > #coordinates then
-                currentIndex = 1 -- Reinicia para a primeira coordenada se todas tiverem sido usadas
-            end
-
-            -- Teleporta o jogador para a próxima coordenada
-            teleportPlayer(player)
-        end
+    while (humanoidRootPart.Position - targetPosition).Magnitude > minDistance do
+        wait(0.1)
     end
+
+    currentIndex = currentIndex + 1
 end
-
--- Assumindo que este script é executado ao adicionar um jogador
-game.Players.PlayerAdded:Connect(function(player)
-    teleportPlayer(player)
-
-    -- Verifica a distância periodicamente
-    while true do
-        task.wait(1)
-        checkDistance(player)
-    end
-end)
