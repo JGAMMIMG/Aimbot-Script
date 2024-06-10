@@ -58,4 +58,27 @@ local function forceMove()
     humanoidRootPart.CanCollide = true
 end
 
+-- Detecta quando o jogador está sentado
+local function isSitting()
+    local seat = character:FindFirstChildOfClass("Seat")
+    local vehicleSeat = character:FindFirstChildOfClass("VehicleSeat")
+    return seat or vehicleSeat
+end
+
+-- Monitora o estado do jogador
+local function monitorPlayerState()
+    while getgenv().teleport do
+        if isSitting() then
+            local seat = isSitting()
+            local weld = seat:FindFirstChildWhichIsA("Weld")
+            if weld then
+                weld:Destroy() -- Remove o weld para permitir o movimento
+            end
+        end
+        wait(0.1)
+    end
+end
+
+-- Inicia o movimento forçado e a monitoração do estado do jogador
+coroutine.wrap(monitorPlayerState)()
 forceMove()
